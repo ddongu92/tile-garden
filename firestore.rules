@@ -1,0 +1,98 @@
+rules_version = '2';
+
+// 타일 정원 보안 규칙
+// - 게임 상태(GameState)는 중첩 배열 때문에 stateJson 문자열로 저장하고,
+//   "지금 둘 차례인 사람의 uid"는 turnUid 필드에 따로 둔다.
+// - 친구끼리 하는 게임이므로 수의 합법성 검사는 클라이언트 트랜잭션이 하고,
+//   규칙은 "누가 / 언제 / 어떤 필드를" 바꿀 수 있는지만 막는다.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /rooms/{code} {
+      function signedIn() {
+        return request.auth != null;
+      }
+      function isHost() {
+        return signedIn() && resource.data.hostUid == request.auth.uid;
+      }
+      function changed() {
+        return request.resource.data.diff(resource.data).affectedKeys();
+      }
+      function newSeats() {
+        return request.resource.data.seats;
+      }
+      function oldSeats() {
+        return resource.data.seats;
+      }
+      function validSeat(s) {
+        return s.keys().hasOnly(['uid', 'name', 'joinedAt'])
+          && s.uid is string && s.name is string
+          && s.name.size() > 0 && s.name.size() <= 10;
+      }
+      function lobbyOnly() {
+        return resource.data.status == 'lobby' && request.resource.data.status == 'lobby'
+          && changed().hasOnly(['seats', 'updatedAt', 'expireAt']);
+      }
+
+      // 대기실: 본인 좌석 추가(최대 4명)
+      function joinLobby() {
+        return lobbyOnly()
+          && newSeats().size() == oldSeats().size() + 1
+          && newSeats().size() <= 4
+          && newSeats().hasAll(oldSeats())
+          && newSeats()[newSeats().size() - 1].uid == request.auth.uid
+          && validSeat(newSeats()[newSeats().size() - 1]);
+      }
+      // 대기실: 본인 좌석 빼기
+      function leaveLobby() {
+        return lobbyOnly()
+          && newSeats().size() == oldSeats().size() - 1
+          && oldSeats().hasAll(newSeats())
+          && oldSeats().removeAll(newSeats())[0].uid == request.auth.uid;
+      }
+      // 대기실: 방장의 강퇴
+      function hostKick() {
+        return isHost() && lobbyOnly()
+          && newSeats().size() < oldSeats().size()
+          && oldSeats().hasAll(newSeats());
+      }
+      // 게임 시작 / 같은 멤버로 다시 하기: 방장만
+      function hostStart() {
+        return isHost()
+          && resource.data.status in ['lobby', 'finished']
+          && request.resource.data.status == 'playing'
+          && oldSeats().size() >= 2
+          && request.resource.data.version == resource.data.version + 1
+          && request.resource.data.turnUid is string
+          && changed().hasOnly(['status', 'stateJson', 'turnUid', 'version', 'updatedAt', 'expireAt']);
+      }
+      // 게임 중 수 두기: 지금 차례인 사람만, version은 정확히 +1
+      function playMove() {
+        return resource.data.status == 'playing'
+          && resource.data.turnUid == request.auth.uid
+          && request.resource.data.version == resource.data.version + 1
+          && request.resource.data.status in ['playing', 'finished']
+          && changed().hasOnly(['stateJson', 'turnUid', 'version', 'status', 'updatedAt', 'expireAt']);
+      }
+
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && request.resource.data.hostUid == request.auth.uid
+        && request.resource.data.code == code
+        && code.matches('^[A-HJ-NP-Z]{4}$')
+        && request.resource.data.status == 'lobby'
+        && request.resource.data.version == 0
+        && request.resource.data.seats.size() == 1
+        && request.resource.data.seats[0].uid == request.auth.uid
+        && validSeat(request.resource.data.seats[0]);
+
+      allow update: if signedIn()
+        && request.resource.data.code == resource.data.code
+        && request.resource.data.hostUid == resource.data.hostUid
+        && (request.resource.data.stateJson == null || request.resource.data.stateJson.size() < 200000)
+        && (joinLobby() || leaveLobby() || hostKick() || hostStart() || playMove());
+
+      allow delete: if isHost();
+    }
+  }
+}

@@ -34,6 +34,8 @@ export function Room() {
   const [name, setName] = useStoredState('tg.name', '');
   const [draftName, setDraftName] = useState(name);
   const [phase, setPhase] = useState<Phase>(name.trim() ? { kind: 'loading' } : { kind: 'name' });
+  /** 닉네임이 정해지면 true — 입장·구독 effect의 시작 신호 */
+  const [entering, setEntering] = useState(!!name.trim());
   const [uid, setUid] = useState<string | null>(null);
   const [room, setRoom] = useState<RoomData | null>(null);
   const [offline, setOffline] = useState(false);
@@ -50,7 +52,7 @@ export function Room() {
 
   // 입장 + 실시간 구독
   useEffect(() => {
-    if (phase.kind !== 'loading') return;
+    if (!entering) return;
     if (!firebaseReady) {
       setPhase({ kind: 'error', message: '온라인 기능이 설정되지 않았습니다(.env 필요).' });
       return;
@@ -89,7 +91,9 @@ export function Room() {
       cancelled = true;
       unsub?.();
     };
-  }, [phase.kind, code, name, showToast]);
+    // name은 입장 시점 값만 쓰면 되므로 의존성에서 제외
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entering, code, showToast]);
 
   // 브라우저 온라인/오프라인 감지
   useEffect(() => {
@@ -166,6 +170,7 @@ export function Room() {
                 if (e.key === 'Enter' && draftName.trim()) {
                   setName(draftName.trim());
                   setPhase({ kind: 'loading' });
+                  setEntering(true);
                 }
               }}
             />
@@ -178,6 +183,7 @@ export function Room() {
             onClick={() => {
               setName(draftName.trim());
               setPhase({ kind: 'loading' });
+              setEntering(true);
             }}
           >
             입장하기
