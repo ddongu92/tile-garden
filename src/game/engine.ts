@@ -93,7 +93,7 @@ function setupRound(state: GameState, rng: Rng) {
   }
   state.center = [];
   state.firstMarkerInCenter = true;
-  if (state.nextStartPlayer !== null) state.currentPlayer = state.nextStartPlayer;
+  if (state.nextStartPlayer !== null) state.currentPlayer = activeFrom(state, state.nextStartPlayer);
   state.nextStartPlayer = null;
 }
 
@@ -139,6 +139,7 @@ function sourceTiles(state: GameState, move: Move): Color[] | null {
 
 export function isLegal(state: GameState, move: Move): boolean {
   if (state.phase !== 'offer') return false;
+  if (state.players[state.currentPlayer].forfeited) return false;
   const tiles = sourceTiles(state, move);
   if (!tiles || !tiles.includes(move.color)) return false;
   if (move.target.kind === 'floor') return true;
@@ -277,7 +278,7 @@ export function applyMove(prev: GameState, move: Move, rng: Rng): GameState {
   // 3) 라운드 종료 판정
   const offerDone = state.factories.every((f) => f.length === 0) && state.center.length === 0;
   if (!offerDone) {
-    state.currentPlayer = (state.currentPlayer + 1) % state.players.length;
+    state.currentPlayer = activeFrom(state, state.currentPlayer + 1);
     return state;
   }
 
@@ -331,18 +332,52 @@ function wallTiling(state: GameState) {
   if (state.nextStartPlayer === null) state.nextStartPlayer = state.currentPlayer;
 }
 
+/** 순위: 포기하지 않은 사람 우선 → 점수 → 완성한 가로 줄 수. 모두 같으면 같은 순위 */
 export function rankPlayers(
-  entries: { player: number; score: number; rowsCompleted: number }[],
+  entries: { player: number; score: number; rowsCompleted: number; forfeited?: boolean }[],
 ): { player: number; rank: number }[] {
-  const sorted = [...entries].sort((a, b) => b.score - a.score || b.rowsCompleted - a.rowsCompleted);
+  const f = (e: { forfeited?: boolean }) => (e.forfeited ? 1 : 0);
+  const sorted = [...entries].sort(
+    (a, b) => f(a) - f(b) || b.score - a.score || b.rowsCompleted - a.rowsCompleted,
+  );
   const out: { player: number; rank: number }[] = [];
   sorted.forEach((e, i) => {
     const prev = sorted[i - 1];
-    const rank =
-      prev && prev.score === e.score && prev.rowsCompleted === e.rowsCompleted ? out[i - 1].rank : i + 1;
-    out.push({ player: e.player, rank });
+    const same =
+      prev && f(prev) === f(e) && prev.score === e.score && prev.rowsCompleted === e.rowsCompleted;
+    out.push({ player: e.player, rank: same ? out[i - 1].rank : i + 1 });
   });
   return out;
+}
+
+/** i부터 시계 방향으로 포기하지 않은 첫 플레이어 */
+function activeFrom(state: GameState, i: number): number {
+  const n = state.players.length;
+  for (let k = 0; k < n; k++) {
+    const idx = (((i + k) % n) + n) % n;
+    if (!state.players[idx].forfeited) return idx;
+  }
+  return ((i % n) + n) % n;
+}
+
+/**
+ * 플레이어 포기. 포기한 사람은 이후 차례를 건너뛰고 최종 순위에서 맨 뒤가 된다.
+ * 남은 사람이 1명 이하가 되면 즉시 게임이 끝난다.
+ */
+export function forfeitPlayer(prev: GameState, playerIndex: number): GameState {
+  if (prev.phase !== 'offer') throw new Error('진행 중인 게임이 아닙니다.');
+  const target = prev.players[playerIndex];
+  if (!target || target.forfeited) throw new Error('이미 포기했거나 없는 플레이어입니다.');
+  const state = clone(prev);
+  state.players[playerIndex].forfeited = true;
+  pushLog(state, `${target.name} 님이 포기했습니다.`);
+  const active = state.players.filter((p) => !p.forfeited).length;
+  if (active <= 1) {
+    finishGame(state);
+    return state;
+  }
+  if (state.currentPlayer === playerIndex) state.currentPlayer = activeFrom(state, playerIndex + 1);
+  return state;
 }
 
 function finishGame(state: GameState) {
@@ -359,6 +394,7 @@ function finishGame(state: GameState) {
       colsBonus: b.cols * rules.colBonus,
       colorsBonus: b.colors * rules.colorBonus,
       rowsCompleted: b.rows,
+      forfeited: !!board.forfeited,
     };
   });
   const ranks = rankPlayers(partial);

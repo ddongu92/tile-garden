@@ -8,7 +8,7 @@ import {
   type DocumentSnapshot,
 } from 'firebase/firestore';
 import { ROOM_TTL_MS } from '../config';
-import { applyMove, createGame, defaultRng, isLegal, type GameState, type Move } from '../game';
+import { applyMove, createGame, defaultRng, forfeitPlayer, isLegal, type GameState, type Move } from '../game';
 import { ensureUser, getDb } from './firebase';
 
 export interface Seat {
@@ -28,6 +28,8 @@ interface RoomDoc {
   stateJson: string | null;
   /** 지금 수를 둘 사람의 uid(보안 규칙에서 검사) */
   turnUid: string | null;
+  /** 이번 게임 참가자 uid(포기 권한 검사용) */
+  playerUids?: string[];
   version: number;
   updatedAt: Timestamp;
   /** TTL 정책용 만료 시각 */
@@ -212,10 +214,37 @@ export async function startGame(code: string): Promise<void> {
       status: 'playing',
       stateJson: JSON.stringify(state),
       turnUid: state.players[state.currentPlayer].uid,
+      playerUids: state.players.map((p) => p.uid),
       version: d.version + 1,
       ...stamps(),
     });
   });
+}
+
+/** 게임 도중 포기(내 차례가 아니어도 가능) */
+export async function forfeitGame(code: string): Promise<void> {
+  const user = await ensureUser();
+  const ref = roomRef(code);
+  await retryOnRace(() =>
+    runTransaction(getDb(), async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists()) throw new RoomError('NOT_FOUND', '방이 없습니다.');
+      const d = snap.data() as RoomDoc;
+      if (d.status !== 'playing' || !d.stateJson) throw new RoomError('STALE', '게임이 진행 중이 아닙니다.');
+      const state = JSON.parse(d.stateJson) as GameState;
+      const me = state.players.findIndex((p) => p.uid === user.uid);
+      if (me < 0 || state.players[me].forfeited) return;
+      const next = forfeitPlayer(state, me);
+      const finished = next.phase === 'finished';
+      tx.update(ref, {
+        stateJson: JSON.stringify(next),
+        turnUid: finished ? null : next.players[next.currentPlayer].uid,
+        status: finished ? 'finished' : 'playing',
+        version: d.version + 1,
+        ...stamps(),
+      });
+    }),
+  );
 }
 
 export async function submitMove(code: string, move: Move): Promise<void> {

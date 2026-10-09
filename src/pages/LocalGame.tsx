@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { applyMove, createGame, defaultRng, type GameState, type Move } from '../game';
+import { applyMove, createGame, defaultRng, forfeitPlayer, type GameState, type Move } from '../game';
 import { GameView } from '../ui/GameView';
 import { storage } from '../ui/settings';
 import s from '../ui/ui.module.css';
@@ -98,6 +98,7 @@ export function LocalGame() {
       canAct
       hotseat
       onMove={onMove}
+      onForfeit={() => setState((prev) => (prev && prev.phase === 'offer' ? forfeitPlayer(prev, prev.currentPlayer) : prev))}
       topRight={
         <button
           type="button"

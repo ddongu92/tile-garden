@@ -4,6 +4,7 @@ import {
   countTiles,
   createGame,
   finalBonus,
+  forfeitPlayer,
   isLegal,
   legalMoves,
   rankPlayers,
@@ -264,6 +265,55 @@ describe('11. 무작위 시뮬레이션', () => {
       }
       expect(s.result).toBeDefined();
       for (const p of s.players) expect(p.score).toBeGreaterThanOrEqual(0);
+    }
+  }, 60000);
+});
+
+describe('12. 포기', () => {
+  it('차례인 사람이 포기하면 다음 사람 차례, 이후 그 사람은 건너뛴다', () => {
+    let s = createGame(players(3), seededRng(20));
+    const quitter = s.currentPlayer;
+    s = forfeitPlayer(s, quitter);
+    expect(s.phase).toBe('offer');
+    expect(s.currentPlayer).toBe((quitter + 1) % 3);
+    for (let i = 0; i < 6 && s.phase === 'offer'; i++) {
+      s = applyMove(s, legalMoves(s)[0], seededRng(i));
+      expect(s.currentPlayer).not.toBe(quitter);
+    }
+  });
+
+  it('2인 게임에서 한 명이 포기하면 즉시 종료, 남은 사람이 승리', () => {
+    let s = createGame(players(2), seededRng(21));
+    s.players[0].score = 30; // 점수가 높아도 포기하면 꼴찌
+    s = forfeitPlayer(s, 0);
+    expect(s.phase).toBe('finished');
+    expect(s.result!.winners).toEqual([1]);
+    expect(s.result!.ranking[1]).toMatchObject({ player: 0, rank: 2, forfeited: true });
+  });
+
+  it('포기한 사람은 이미 포기했으면 다시 포기할 수 없다', () => {
+    const s = forfeitPlayer(createGame(players(3), seededRng(22)), 1);
+    expect(() => forfeitPlayer(s, 1)).toThrow();
+  });
+
+  it('무작위 포기가 섞인 4인 300판: 예외 없음, 타일 보존, 포기자는 승자가 아님', () => {
+    for (let g = 0; g < 300; g++) {
+      const rng = seededRng(5000 + g);
+      let s = createGame(players(4), rng);
+      let guard = 0;
+      while (s.phase === 'offer') {
+        if (rng() < 0.01) {
+          const cand = s.players.map((p, i) => (p.forfeited ? -1 : i)).filter((i) => i >= 0);
+          s = forfeitPlayer(s, cand[Math.floor(rng() * cand.length)]);
+          continue;
+        }
+        const moves = legalMoves(s);
+        expect(s.players[s.currentPlayer].forfeited).toBeFalsy();
+        s = applyMove(s, moves[Math.floor(rng() * moves.length)], rng);
+        if (countTiles(s) !== 100) throw new Error(`게임 ${g}: 타일 수 ${countTiles(s)}`);
+        if (++guard > 5000) throw new Error('무한 루프');
+      }
+      for (const w of s.result!.winners) expect(s.players[w].forfeited).toBeFalsy();
     }
   }, 60000);
 });

@@ -12,6 +12,7 @@ import {
 import { PlayerBoardView } from './PlayerBoardView';
 import { ResultView } from './ResultView';
 import { useAnimationsSetting } from './settings';
+import { useWidthUnit } from './useWidthUnit';
 import { Tile } from './Tile';
 import s from './ui.module.css';
 
@@ -27,6 +28,8 @@ interface Props {
   topRight?: ReactNode;
   resultActions?: ReactNode;
   banner?: ReactNode;
+  /** 포기 처리(없으면 버튼 숨김) */
+  onForfeit?: () => Promise<void> | void;
 }
 
 interface Selection {
@@ -37,7 +40,7 @@ interface Selection {
 const sameSource = (a: MoveSource, b: MoveSource) =>
   a.kind === b.kind && (a.kind === 'center' || (b.kind === 'factory' && a.index === b.index));
 
-export function GameView({ state, viewer, canAct, onMove, hotseat, topRight, resultActions, banner }: Props) {
+export function GameView({ state, viewer, canAct, onMove, hotseat, topRight, resultActions, banner, onForfeit }: Props) {
   const [sel, setSel] = useState<Selection | null>(null);
   const [target, setTarget] = useState<MoveTarget | null>(null);
   const [zoom, setZoom] = useState<number | null>(null);
@@ -47,6 +50,7 @@ export function GameView({ state, viewer, canAct, onMove, hotseat, topRight, res
   const [sending, setSending] = useState(false);
   const seenRound = useRef<number | undefined>(state.lastRound?.round);
   const wasMyTurn = useRef(false);
+  const tableRef = useWidthUnit<HTMLElement>();
 
   const me = viewer ?? 0;
   const myTurn = canAct && viewer === state.currentPlayer && state.phase === 'offer';
@@ -143,26 +147,34 @@ export function GameView({ state, viewer, canAct, onMove, hotseat, topRight, res
           </div>
         </div>
         <div className={s.turnTools} onClick={(e) => e.stopPropagation()}>
-          <button
-            type="button"
-            className={s.iconBtn}
-            onClick={() => setAnimOn(!animOn)}
-            title="벽 채우기 연출 켜기/끄기"
-          >
-            연출 {animOn ? '켬' : '끔'}
-          </button>
           <button type="button" className={s.iconBtn} onClick={() => setShowLog((v) => !v)}>
-            기록
+            기록·설정
           </button>
+          {onForfeit && viewer !== null && !state.players[viewer].forfeited && (
+            <button
+              type="button"
+              className={s.iconBtn}
+              onClick={() => {
+                const who = hotseat ? `${state.players[viewer].name} 님이 ` : '';
+                if (window.confirm(`${who}포기할까요?
+포기하면 이후 차례를 건너뛰고 최종 순위는 맨 뒤가 됩니다.`)) onForfeit();
+              }}
+            >
+              포기
+            </button>
+          )}
           {topRight}
         </div>
       </header>
 
       {banner}
+      {viewer !== null && state.players[viewer].forfeited && (
+        <div className={s.banner}>포기했습니다. 남은 사람들의 게임을 관전 중이에요.</div>
+      )}
 
       <div className={s.minis} onClick={(e) => e.stopPropagation()}>
         {others.map((i) => (
-          <button type="button" key={i} className={s.miniBtn} onClick={() => setZoom(i)} aria-label={`${state.players[i].name} 보드 크게 보기`}>
+          <button type="button" key={i} className={`${s.miniBtn} ${state.currentPlayer === i ? s.miniTurn : ''}`} onClick={() => setZoom(i)} aria-label={`${state.players[i].name} 보드 크게 보기`}>
             <PlayerBoardView
               state={state}
               playerIndex={i}
@@ -173,7 +185,7 @@ export function GameView({ state, viewer, canAct, onMove, hotseat, topRight, res
         ))}
       </div>
 
-      <section className={s.table} data-n={factoryCount}>
+      <section ref={tableRef} className={s.table} data-n={factoryCount}>
         {state.factories.map((tiles, fi) => {
           const angle = (fi / factoryCount) * Math.PI * 2 - Math.PI / 2;
           const R = 38;
@@ -280,9 +292,19 @@ export function GameView({ state, viewer, canAct, onMove, hotseat, topRight, res
           <div className={s.modalBody} onClick={(e) => e.stopPropagation()}>
             <div className={s.modalHead}>
               <strong>게임 기록</strong>
-              <button type="button" className={s.iconBtn} onClick={() => setShowLog(false)}>
-                닫기
-              </button>
+              <div className={s.row} style={{ flex: 'none' }}>
+                <button
+                  type="button"
+                  className={s.iconBtn}
+                  onClick={() => setAnimOn(!animOn)}
+                  title="벽 채우기 연출 켜기/끄기"
+                >
+                  연출 {animOn ? '켬' : '끔'}
+                </button>
+                <button type="button" className={s.iconBtn} onClick={() => setShowLog(false)}>
+                  닫기
+                </button>
+              </div>
             </div>
             <ol className={s.log}>
               {[...state.log].reverse().map((l, i) => (

@@ -30,7 +30,10 @@ export function ResultView({ state, actions }: { state: GameState; actions?: Rea
             {result.ranking.map((r) => (
               <tr key={r.player} className={r.rank === 1 ? s.winnerRow : ''}>
                 <td>{r.rank}</td>
-                <td>{state.players[r.player].name}</td>
+                <td>
+                  {state.players[r.player].name}
+                  {r.forfeited && <span className={s.tag}>포기</span>}
+                </td>
                 <td>{r.placementPoints}</td>
                 <td>{r.floorPenalty ? `-${r.floorPenalty}` : 0}</td>
                 <td>+{r.rowsBonus}</td>

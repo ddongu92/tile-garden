@@ -6,6 +6,7 @@ import {
   MAX_SEATS,
   deleteRoom,
   errorMessage,
+  forfeitGame,
   isValidCode,
   joinRoom,
   kickSeat,
@@ -362,6 +363,7 @@ export function Room() {
         viewer={spectator ? null : viewer}
         canAct={!spectator && !busy}
         onMove={onMove}
+        onForfeit={spectator ? undefined : () => run(() => forfeitGame(code))}
         banner={
           <>
             {offlineBanner}

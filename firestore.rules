@@ -63,12 +63,22 @@ service cloud.firestore {
           && oldSeats().size() >= 2
           && request.resource.data.version == resource.data.version + 1
           && request.resource.data.turnUid is string
-          && changed().hasOnly(['status', 'stateJson', 'turnUid', 'version', 'updatedAt', 'expireAt']);
+          && changed().hasOnly(['status', 'stateJson', 'turnUid', 'playerUids', 'version', 'updatedAt', 'expireAt']);
       }
       // 게임 중 수 두기: 지금 차례인 사람만, version은 정확히 +1
       function playMove() {
         return resource.data.status == 'playing'
           && resource.data.turnUid == request.auth.uid
+          && request.resource.data.version == resource.data.version + 1
+          && request.resource.data.status in ['playing', 'finished']
+          && changed().hasOnly(['stateJson', 'turnUid', 'version', 'status', 'updatedAt', 'expireAt']);
+      }
+
+      // 게임 중 포기: 이번 게임 참가자라면 내 차례가 아니어도 가능
+      function forfeit() {
+        return resource.data.status == 'playing'
+          && ('playerUids' in resource.data)
+          && request.auth.uid in resource.data.playerUids
           && request.resource.data.version == resource.data.version + 1
           && request.resource.data.status in ['playing', 'finished']
           && changed().hasOnly(['stateJson', 'turnUid', 'version', 'status', 'updatedAt', 'expireAt']);
@@ -90,7 +100,7 @@ service cloud.firestore {
         && request.resource.data.code == resource.data.code
         && request.resource.data.hostUid == resource.data.hostUid
         && (request.resource.data.stateJson == null || request.resource.data.stateJson.size() < 200000)
-        && (joinLobby() || leaveLobby() || hostKick() || hostStart() || playMove());
+        && (joinLobby() || leaveLobby() || hostKick() || hostStart() || playMove() || forfeit());
 
       allow delete: if isHost();
     }

@@ -18,6 +18,8 @@ export interface PlayerBoard {
   /** 누적 통계(결과 화면용) */
   placementPoints: number;
   floorPenalty: number;
+  /** 게임 도중 포기 */
+  forfeited?: boolean;
 }
 
 export interface LogEntry {
@@ -50,6 +52,7 @@ export interface PlayerResult {
   colsBonus: number;
   colorsBonus: number;
   rowsCompleted: number;
+  forfeited: boolean;
 }
 
 export interface FinalResult {
