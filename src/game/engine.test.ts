@@ -213,6 +213,7 @@ describe('9. 종료와 보너스', () => {
     setTable(s, [['white']]);
     s = applyMove(s, { source: { kind: 'factory', index: 0 }, color: 'white', target: { kind: 'line', index: 0 } }, seededRng(0));
     expect(s.phase).toBe('finished');
+    expect(s.result!.endedBy).toBe('wall');
     const bonus = finalBonus(s.players[p]);
     expect(bonus.rows).toBe(1);
     expect(bonus.cols).toBe(1);
@@ -288,6 +289,7 @@ describe('12. 포기', () => {
     s = forfeitPlayer(s, 0);
     expect(s.phase).toBe('finished');
     expect(s.result!.winners).toEqual([1]);
+    expect(s.result!.endedBy).toBe('forfeit');
     expect(s.result!.ranking[1]).toMatchObject({ player: 0, rank: 2, forfeited: true });
   });
 

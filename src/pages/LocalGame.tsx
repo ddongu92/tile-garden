@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { applyMove, createGame, defaultRng, forfeitPlayer, type GameState, type Move } from '../game';
 import { GameView } from '../ui/GameView';
 import { storage } from '../ui/settings';
@@ -20,6 +20,13 @@ export function LocalGame() {
   const [state, setState] = useState<GameState | null>(load);
   const [names, setNames] = useState(['', '', '', '']);
   const [count, setCount] = useState(2);
+  const nav = useNavigate();
+  const goHome = useCallback(() => {
+    // 화면 전환으로 저장 effect가 돌기 전에 언마운트되므로 직접 비운다
+    storage.write(KEY, '');
+    setState(null);
+    nav('/');
+  }, [nav]);
 
   useEffect(() => {
     storage.write(KEY, state ? JSON.stringify(state) : '');
@@ -98,6 +105,7 @@ export function LocalGame() {
       canAct
       hotseat
       onMove={onMove}
+      onExit={goHome}
       onForfeit={() => setState((prev) => (prev && prev.phase === 'offer' ? forfeitPlayer(prev, prev.currentPlayer) : prev))}
       topRight={
         <button

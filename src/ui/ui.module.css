@@ -809,3 +809,19 @@ button.floor {
     grid-column: 1 / -1;
   }
 }
+
+.trophy {
+  font-size: 56px;
+  line-height: 1;
+  margin-top: 8px;
+}
+.linkBtn {
+  background: none;
+  border: 0;
+  padding: 0 0 0 8px;
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: 14px;
+}

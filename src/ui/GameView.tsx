@@ -9,6 +9,7 @@ import {
   type MoveTarget,
   type RoundSummary,
 } from '../game';
+import { ForfeitEndView } from './ForfeitEndView';
 import { PlayerBoardView } from './PlayerBoardView';
 import { ResultView } from './ResultView';
 import { useAnimationsSetting } from './settings';
@@ -30,6 +31,8 @@ interface Props {
   banner?: ReactNode;
   /** 포기 처리(없으면 버튼 숨김) */
   onForfeit?: () => Promise<void> | void;
+  /** 포기로 게임이 끝났을 때 처음 화면으로 나가기 */
+  onExit?: () => void;
 }
 
 interface Selection {
@@ -40,7 +43,7 @@ interface Selection {
 const sameSource = (a: MoveSource, b: MoveSource) =>
   a.kind === b.kind && (a.kind === 'center' || (b.kind === 'factory' && a.index === b.index));
 
-export function GameView({ state, viewer, canAct, onMove, hotseat, topRight, resultActions, banner, onForfeit }: Props) {
+export function GameView({ state, viewer, canAct, onMove, hotseat, topRight, resultActions, banner, onForfeit, onExit }: Props) {
   const [sel, setSel] = useState<Selection | null>(null);
   const [target, setTarget] = useState<MoveTarget | null>(null);
   const [zoom, setZoom] = useState<number | null>(null);
@@ -120,6 +123,10 @@ export function GameView({ state, viewer, canAct, onMove, hotseat, topRight, res
     }
   };
 
+  if (state.phase === 'finished' && state.result?.endedBy === 'forfeit' && onExit) {
+    return <ForfeitEndView state={state} viewer={viewer} onExit={onExit} />;
+  }
+
   if (state.phase === 'finished') {
     return (
       <div className={s.game}>
@@ -169,7 +176,14 @@ export function GameView({ state, viewer, canAct, onMove, hotseat, topRight, res
 
       {banner}
       {viewer !== null && state.players[viewer].forfeited && (
-        <div className={s.banner}>포기했습니다. 남은 사람들의 게임을 관전 중이에요.</div>
+        <div className={s.banner}>
+          포기했습니다. 남은 사람들의 게임을 관전 중이에요.
+          {onExit && (
+            <button type="button" className={s.linkBtn} onClick={onExit}>
+              처음 화면으로
+            </button>
+          )}
+        </div>
       )}
 
       <div className={s.minis} onClick={(e) => e.stopPropagation()}>

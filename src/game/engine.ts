@@ -286,7 +286,7 @@ export function applyMove(prev: GameState, move: Move, rng: Rng): GameState {
 
   const ended = state.players.some((p) => p.wall.some((row) => row.every(Boolean)));
   if (ended) {
-    finishGame(state);
+    finishGame(state, 'wall');
     return state;
   }
 
@@ -295,7 +295,7 @@ export function applyMove(prev: GameState, move: Move, rng: Rng): GameState {
   if (state.factories.every((f) => f.length === 0)) {
     // 모든 타일이 벽/패턴 줄에 있어 더 진행할 수 없는 극단적인 경우
     pushLog(state, '남은 타일이 없어 게임을 종료합니다.');
-    finishGame(state);
+    finishGame(state, 'noTiles');
     return state;
   }
   pushLog(state, `라운드 ${state.round} 시작 — ${state.players[state.currentPlayer].name} 님 차례`);
@@ -373,14 +373,14 @@ export function forfeitPlayer(prev: GameState, playerIndex: number): GameState {
   pushLog(state, `${target.name} 님이 포기했습니다.`);
   const active = state.players.filter((p) => !p.forfeited).length;
   if (active <= 1) {
-    finishGame(state);
+    finishGame(state, 'forfeit');
     return state;
   }
   if (state.currentPlayer === playerIndex) state.currentPlayer = activeFrom(state, playerIndex + 1);
   return state;
 }
 
-function finishGame(state: GameState) {
+function finishGame(state: GameState, endedBy: FinalResult['endedBy']) {
   const rules = rulesOf(state);
   const partial = state.players.map((board, player) => {
     const b = finalBonus(board, rules);
@@ -402,6 +402,7 @@ function finishGame(state: GameState) {
   const result: FinalResult = {
     ranking,
     winners: ranking.filter((r) => r.rank === 1).map((r) => r.player),
+    endedBy,
   };
   state.result = result;
   state.phase = 'finished';

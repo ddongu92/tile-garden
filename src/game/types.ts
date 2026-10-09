@@ -58,6 +58,8 @@ export interface PlayerResult {
 export interface FinalResult {
   ranking: PlayerResult[]; // 순위 순
   winners: number[]; // 플레이어 인덱스(공동 승리 가능)
+  /** 종료 사유: 벽 가로 줄 완성 / 남은 타일 없음 / 1명 빼고 모두 포기 */
+  endedBy: 'wall' | 'noTiles' | 'forfeit';
 }
 
 export interface GameState {

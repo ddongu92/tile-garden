@@ -133,6 +133,8 @@ export function Room() {
     }
   };
 
+  const goHome = useCallback(() => nav('/'), [nav]);
+
   const shareUrl = `${location.origin}/r/${code}`;
   const copyLink = async () => {
     try {
@@ -364,6 +366,7 @@ export function Room() {
         canAct={!spectator && !busy}
         onMove={onMove}
         onForfeit={spectator ? undefined : () => run(() => forfeitGame(code))}
+        onExit={goHome}
         banner={
           <>
             {offlineBanner}
