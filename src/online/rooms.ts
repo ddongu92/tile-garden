@@ -98,6 +98,22 @@ function toRoom(snap: DocumentSnapshot): Room | null {
   };
 }
 
+/**
+ * 동시에 두 사람이 좌석을 바꾸면, 늦은 트랜잭션은 보안 규칙이 이미 바뀐 문서 기준으로
+ * 평가해 permission-denied로 거절된다(SDK가 자동 재시도하지 않음). 그런 경우 잠시 뒤 다시 시도한다.
+ */
+async function retryOnRace<T>(fn: () => Promise<T>, tries = 4): Promise<T> {
+  for (let i = 0; ; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      const code = (e as { code?: string })?.code;
+      if (i >= tries - 1 || (code !== 'permission-denied' && code !== 'aborted')) throw e;
+      await new Promise((r) => setTimeout(r, 150 + Math.random() * 400));
+    }
+  }
+}
+
 const cleanName = (name: string) => name.trim().slice(0, 10) || '이름없음';
 
 export async function createRoom(name: string): Promise<string> {
@@ -135,7 +151,7 @@ export async function createRoom(name: string): Promise<string> {
 export async function joinRoom(code: string, name: string): Promise<{ seated: boolean }> {
   const user = await ensureUser();
   const ref = roomRef(code);
-  return runTransaction(getDb(), async (tx) => {
+  return retryOnRace(() => runTransaction(getDb(), async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists()) throw new RoomError('NOT_FOUND', '그런 방이 없습니다. 방 코드를 확인해 주세요.');
     const d = snap.data() as RoomDoc;
@@ -148,32 +164,32 @@ export async function joinRoom(code: string, name: string): Promise<{ seated: bo
       ...stamps(),
     });
     return { seated: true };
-  });
+  }));
 }
 
 export async function leaveRoom(code: string): Promise<void> {
   const user = await ensureUser();
   const ref = roomRef(code);
-  await runTransaction(getDb(), async (tx) => {
+  await retryOnRace(() => runTransaction(getDb(), async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists()) return;
     const d = snap.data() as RoomDoc;
     if (d.status !== 'lobby') return;
     tx.update(ref, { seats: d.seats.filter((s) => s.uid !== user.uid), ...stamps() });
-  });
+  }));
 }
 
 export async function kickSeat(code: string, uid: string): Promise<void> {
   const user = await ensureUser();
   const ref = roomRef(code);
-  await runTransaction(getDb(), async (tx) => {
+  await retryOnRace(() => runTransaction(getDb(), async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists()) return;
     const d = snap.data() as RoomDoc;
     if (d.hostUid !== user.uid) throw new RoomError('NOT_HOST', '방장만 내보낼 수 있습니다.');
     if (d.status !== 'lobby') throw new RoomError('STARTED', '대기실에서만 내보낼 수 있습니다.');
     tx.update(ref, { seats: d.seats.filter((s) => s.uid !== uid), ...stamps() });
-  });
+  }));
 }
 
 /** 게임 시작 또는 같은 멤버로 다시 하기 */
