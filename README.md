@@ -84,14 +84,19 @@ Firebase 설정(.env)이 없으면 **"한 기기에서 하기"(핫시트)**만 �
 2. 대시보드에서 **[Add New…] → [Project]** → 방금 만든 저장소 옆 **[Import]**
 3. Framework Preset이 **Vite**로 잡혔는지 확인
 4. **[Environment Variables]**를 펼쳐 `.env`의 6개 값을 이름·값 그대로 하나씩 추가
-5. **[Deploy]** → 1~2분 뒤 `https://tile-garden-xxxx.vercel.app` 같은 주소가 생깁니다.
+   > ⚠️ Vercel이 `VITE_FIREBASE_API_KEY`를 자동으로 **Secret**으로 분류하면 값이 `AIza•••`처럼 가려진 채 빌드되어
+   > "api-key-not-valid" 오류가 납니다. 경고 아이콘의 **[Change to Config]**를 눌러 **Config** 유형으로 저장하세요.
+   > (Firebase 웹 키는 원래 브라우저에 공개되는 값이며, 데이터 보호는 보안 규칙이 담당합니다.)
+   > 이미 Secret으로 저장했다면 Config로 바꿀 수 없으니 **삭제 후 다시 추가**하고, Deployments에서 **Redeploy** 하세요.
+5. **[Deploy]** → 1~2분 뒤 고정 주소 `https://tile-garden.vercel.app`(프로젝트 이름에 따라 다름)이 생깁니다.
+   `tile-garden-abc123-...vercel.app`처럼 해시가 붙은 주소는 배포마다 바뀌는 임시 주소이고 로그인이 필요하니 친구에게는 고정 주소를 보내세요.
 
 이후에는 GitHub에 push할 때마다 자동으로 다시 배포됩니다. `/r/ABCD` 같은 주소를 새로고침해도 동작하도록 [`vercel.json`](vercel.json)에 rewrite 설정이 들어 있습니다.
 
 ### 7단계. Firebase에 Vercel 주소 허용
 
-1. Firebase 콘솔 **[Authentication] → [설정] 탭 → [승인된 도메인]**
-2. **[도메인 추가]** → `tile-garden-xxxx.vercel.app` (https:// 없이) → [추가]
+1. Firebase 콘솔 **[보안] → [Authentication] → [설정] 탭 → [승인된 도메인]**
+2. **[도메인 추가]** → `tile-garden.vercel.app` (https:// 없이, 고정 주소) → [추가]
 
 ### 8단계. 친구들과 플레이
 
