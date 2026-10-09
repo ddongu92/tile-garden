@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { APP_NAME } from '../config';
 import { COLORS } from '../game';
 import { firebaseReady } from '../online/firebase';
+import { isIOS, isStandalone, useInstallPrompt } from '../pwa';
 import { createRoom, errorMessage, isValidCode, normalizeCode } from '../online/rooms';
 import { useStoredState } from '../ui/settings';
 import { Tile } from '../ui/Tile';
@@ -14,6 +15,8 @@ export function Home() {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const { canPrompt, install } = useInstallPrompt();
+  const showInstall = !isStandalone();
 
   const needName = () => {
     if (!name.trim()) {
@@ -100,6 +103,29 @@ export function Home() {
         )}
         {err && <p className={s.error}>{err}</p>}
       </div>
+
+      {showInstall && (
+        <div className={s.card}>
+          <h2 className={s.cardTitle}>폰에 앱으로 설치</h2>
+          {canPrompt ? (
+            <>
+              <p className={s.notice}>홈 화면에 아이콘이 생기고, 주소창 없이 앱처럼 실행됩니다.</p>
+              <button type="button" className={s.btnPrimary} style={{ width: '100%' }} onClick={install}>
+                앱으로 설치하기
+              </button>
+            </>
+          ) : isIOS() ? (
+            <p className={s.notice}>
+              Safari 아래쪽 <strong>공유 버튼(□↑)</strong> → <strong>홈 화면에 추가</strong>를 누르세요.
+            </p>
+          ) : (
+            <p className={s.notice}>
+              브라우저 메뉴(<strong>⋮</strong> 또는 <strong>☰</strong>) → <strong>홈 화면에 추가</strong> 또는{' '}
+              <strong>앱 설치</strong>를 누르세요.
+            </p>
+          )}
+        </div>
+      )}
 
       <div className={s.card}>
         <h2 className={s.cardTitle}>한 기기에서 하기</h2>

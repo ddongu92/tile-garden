@@ -145,9 +145,14 @@ export function GameView({ state, viewer, canAct, onMove, hotseat, topRight, res
   const myPenalty = anim?.penalties.find((p) => p.player === me)?.amount ?? null;
 
   return (
-    <div className={`${s.game} ${myTurn && !hotseat ? s.myTurnGlow : ''}`} onClick={clear}>
-      <header className={`${s.turnBar} ${myTurn ? s.turnBarMine : ''}`}>
-        <div className={s.turnInfo}>
+    <div className={s.game} onClick={clear}>
+      {/* 화면 읽기 프로그램용 차례 알림(눈에 보이는 차례 표시는 보드 테두리) */}
+      <div className={s.srOnly} aria-live="polite">
+        {myTurn && !hotseat ? '내 차례입니다!' : `${current.name} 님 차례`}
+      </div>
+      <header className={s.turnBar}>
+        {/* 넓은 화면에서만 보이는 차례 표시 */}
+        <div className={s.turnInfo} aria-hidden="true">
           <div className={s.turnRound}>라운드 {state.round}</div>
           <div className={s.turnWho}>
             {myTurn && !hotseat ? '내 차례입니다!' : `${current.name} 님 차례`}
@@ -199,7 +204,11 @@ export function GameView({ state, viewer, canAct, onMove, hotseat, topRight, res
         ))}
       </div>
 
-      <section ref={tableRef} className={s.table} data-n={factoryCount}>
+      <section
+        ref={tableRef}
+        className={`${s.table} ${myTurn ? s.tableActive : s.tableIdle}`}
+        data-n={factoryCount}
+      >
         {state.factories.map((tiles, fi) => {
           const angle = (fi / factoryCount) * Math.PI * 2 - Math.PI / 2;
           const R = 38;
@@ -252,7 +261,10 @@ export function GameView({ state, viewer, canAct, onMove, hotseat, topRight, res
         </div>
       </section>
 
-      <section className={s.myArea} onClick={(e) => e.stopPropagation()}>
+      <section
+        className={`${s.myArea} ${state.currentPlayer === me ? s.myAreaTurn : ''}`}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className={s.myHead}>
           <span className={s.myName}>
             {viewer === null ? `${state.players[me].name} 님 보드` : hotseat ? `${state.players[me].name} 님 보드` : '내 보드'}
@@ -305,7 +317,7 @@ export function GameView({ state, viewer, canAct, onMove, hotseat, topRight, res
         <div className={s.modal} onClick={() => setShowLog(false)}>
           <div className={s.modalBody} onClick={(e) => e.stopPropagation()}>
             <div className={s.modalHead}>
-              <strong>게임 기록</strong>
+              <strong>게임 기록 · 라운드 {state.round}</strong>
               <div className={s.row} style={{ flex: 'none' }}>
                 <button
                   type="button"
